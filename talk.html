@@ -1,0 +1,18 @@
+<html>
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+    <title>マルコフ連鎖で文章生成</title>
+</head>
+<body>
+    <h1>マルコフ連鎖で文章生成</h1>
+    元文章を入力して送信ボタンを押すと、新しい文章を生成します。
+    <form action="" method="post">
+        <textarea name="sentences" rows="5" cols="100"></textarea><br />
+            <input type="submit" value="送信"/>
+    </form>
+    {% if result %}
+    <p><b>作成結果</b><br />
+    <p>{{ result }}</p>
+    {% endif %}
+</body>
+</html>
