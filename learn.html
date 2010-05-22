@@ -1,0 +1,34 @@
+<html>
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+    <title>マルコフ連鎖で文章生成</title>
+</head>
+<body>
+    <h1>マルコフ連鎖で文章生成</h1>
+    元文章を入力して送信ボタンを押すと、文章をDBに格納します。
+    <form action="" method="post">
+        <textarea name="sentences" rows="5" cols="100"></textarea><br />
+            <input type="submit" value="送信"/>
+    </form>
+    {% if chains %}
+    <table cellspacing="0" border="1">
+        <tr>
+            <th>Preword1</th>
+            <th>Preword2</th>
+            <th>Postword</th>
+            <th>Count</th>
+            <th>IsStart</th>
+        </tr>
+        {% for chain in chains %}
+        <tr>
+            <td>{{chain.preword1}}</td>
+            <td>{{chain.preword2}}</td>
+            <td>{{chain.postword}}</td>
+            <td>{{chain.count}}</td>
+            <td>{{chain.isstart}}</td>
+        </tr>
+        {% endfor %}
+    </table>
+    {% endif %}
+</body>
+</html>

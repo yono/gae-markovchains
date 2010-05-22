@@ -12,19 +12,10 @@ sys.stdout = stdout
 import os
 from google.appengine.ext import webapp
 from google.appengine.ext.webapp import util, template
-from google.appengine.ext import db
 
-import wakati
-import extractword
 from markovchains import MarkovChains
 
-class ChainNode(db.Model):
-    preword1 = db.StringProperty()
-    preword2 = db.StringProperty()
-    postword = db.StringProperty()
-    count = db.IntegerProperty()
 
-# 受け取ったデータを分解してマルコフに使える形に
 class TalkHandler(webapp.RequestHandler):
     def get(self):
         path = os.path.join(os.path.dirname(__file__), 'talk.html')
@@ -33,8 +24,8 @@ class TalkHandler(webapp.RequestHandler):
     def post(self):
         path = os.path.join(os.path.dirname(__file__), 'talk.html')
         if self.request.get('sentences'):
-            m = MarkovChains()
             text = self.request.get('sentences')
+            m = MarkovChains('gquery')
             m.analyze_sentence(text)
             result = m.make_sentence()
             values = {'result':result}
@@ -42,11 +33,33 @@ class TalkHandler(webapp.RequestHandler):
         else:
             values = {'result':''}
             self.response.out.write(template.render(path, values))
+
+
+class LearnHandler(webapp.RequestHandler):
+    def get(self):
+        path = os.path.join(os.path.dirname(__file__), 'learn.html')
+        m = MarkovChains()
+        m.load_db('gquery')
+        chains = m.db.get_allchain()
+        values = {'chains': chains}
+        self.response.out.write(template.render(path, values))
+
+    def post(self):
+        path = os.path.join(os.path.dirname(__file__), 'learn.html')
+        text = self.request.get('sentences')
+        m = MarkovChains()
+        m.analyze_sentence(text)
+        m.load_db('gquery')
+        m.register_data()
+        chains = m.db.chain.all()
+        values = {'chains': chains}
+        self.response.out.write(template.render(path, values))
         
 
 def main():
     application = webapp.WSGIApplication([
         ('/', TalkHandler),
+        ('/learn', LearnHandler),
         ], debug=False)
     util.run_wsgi_app(application)
 

@@ -2,6 +2,7 @@
 # -*- coding:utf-8 -*-
 import re
 import random
+import sys
 
 from util import *
 from database import Database
@@ -39,8 +40,8 @@ class MarkovChains(object):
     """
     文章を解析し、連想配列に保存
     """
-    def analyze_sentence(self, text, user=''):
-        sentences = self._split_sentences(text)
+    def analyze_sentence(self, _text, user=''):
+        sentences = self._split_sentences(_text)
         text = '%s。' % sentences[0]
         for i in xrange(1,len(sentences)):
             if (len('%s%s' % (text, sentences[i])) < 400):
@@ -114,108 +115,38 @@ class MarkovChains(object):
     連想配列を DB に保存
     """
     def register_data(self):
-        self.register_words()
         self.register_chains()
         self.register_userchains()
 
-    def register_words(self):
-        existwords = self.db.get_allwords()
-
-        words = {}
-        for prewords in self.chaindic:
-            for preword in prewords:
-                words[preword] = 0
-            for postword in self.chaindic[prewords]:
-                words[postword] = 0
-        for user in self.userchaindic:
-            for prewords in self.chaindic:
-                for preword in prewords:
-                    words[preword] = 0
-                for postword in self.chaindic[prewords]:
-                    words[postword] = 0
-
-        sql = ["('%s')" % (MySQLdb.escape_string(x)) for x in words \
-                if x not in existwords]
-
-        if sql:
-            self.db.insert_words(sql)
-
     def register_chains(self):
-        
-        # 現在持ってる chain を全て持ってくる
-        exists = self.db.get_allchain(self.num)
-        words = self.db.get_allwords()
+        exists = self.db.get_allchain()
 
-        # 連想配列から同じ形の chain を作成
-        chains = {}
         for prewords in self.chaindic:
             for postword in self.chaindic[prewords]:
-                chain = []
-                chain.extend(list(prewords))
-                chain.append(postword)
-                chains[tuple(chain)] = self.chaindic[prewords][postword]
-            
-        # ない場合は新たに作成、ある場合は更新
-        insert_step = 1000
-        sql = []
-        for chain in chains:
-            if chain in exists:
-                ids = [words[chain[i]] for i in xrange(len(chain))]
-                count = chains[chain].count + exists[chain].count
-                isstart = chains[chain].isstart or exists[chain].isstart
-                self.db.update_chains(ids, count, isstart)
-            else:
-                values = []
-                for i in xrange(self.num):
-                    values.append("%d" % (words[chain[i]]))
-                sql.append("(%s,%s,%d)" % (','.join(values),
-                                str(chains[chain].isstart).upper(),
-                                    chains[chain].count))
-            if (len(sql) % insert_step) == 0 and len(sql) > 0:
-                self.db.insert_chains(sql)
-                sql = []
-        
-        if sql:
-            self.db.insert_chains(sql)
+                count = self.chaindic[prewords][postword].count
+                isstart = self.chaindic[prewords][postword].isstart
+                chain = [prewords[0], prewords[1], postword, count, isstart]
+                if tuple(chain[0:3]) in exists:
+                    self.db.update_chain(chain)
+                else:
+                    self.db.insert_chain(chain)
 
     def register_userchains(self):
-        words = self.db.get_allwords()
-        allchains = self.db.get_allchain(self.num)
+        exists = self.db.get_userchain()
+        chains = self.userchaindic
 
-        for user in self.userchaindic:
-            userid = self.db.get_user(user)
-            exists = self.db.get_userchain(self.num, userid)
-            chains = {}
-            for prewords in self.userchaindic[user]:
-                for postword in self.userchaindic[user][prewords]:
-                    chain = []
-                    chain.extend(list(prewords))
-                    chain.append(postword)
-                    chains[tuple(chain)] = self.chaindic[prewords][postword]
-        
-            insert_step = 1000
-            sql = []
-            for chain in chains:
-                try:
-                    node = allchains[chain]
-                except:
-                    continue
-
-                if chain in exists:
-                    id = exists[chain][1]
-                    count = chains[chain].count + node.count
-                    self.db.update_userchains(count, id)
-                else:
-                    id = allchains[chain].id
-                    count = chains[chain].count
-                    sql.append("(%d,%d,%d)" % (userid, id, count))
-                    
-                if (len(sql) % insert_step) == 0 and len(sql) > 0:
-                    self.db.insert_userchains(sql)
-                    sql = []
-        
-            if sql:
-                self.db.insert_userchains(sql)
+        for user in chains:
+            for prewords in chains[user]:
+                for postword in chains[user][prewords]:
+                    count = chains[user][prewords][postword].count
+                    isstart = chains[user][prewords][postword].isstart
+                    user = chains[user][prewords][postword].user
+                    chain = [prewords[0], prewords[1], postword, user,
+                             count, isstart]
+                    if tuple(chain[0:4]) in exists:
+                        self.db.update_userchain(chain)
+                    else:
+                        self.db.insert_userchain(chain)
 
     """
     文章生成

@@ -27,11 +27,18 @@ class Wakati(object):
         if flag:
             self.words.append(data)
 
-    def parse_text(self, text):
+    def parse_text(self, _text):
+        text = self._remove_break(_text)
         self.p.ParseFile(yahoowakati.get_xml(text))
 
     def get_words(self):
         return self.words
+
+    def _remove_break(self, _text):
+        text = _text.replace('\r\n', '')
+        text = text.replace('\r', '')
+        text = text.replace('\n', '')
+        return text
 
 
 if __name__=="__main__":
