@@ -3,6 +3,7 @@
 from google.appengine.ext import db
 import random
 import sys
+import copy
 
 
 class Chain(db.Model):
@@ -20,6 +21,13 @@ class UserChain(db.Model):
     user = db.StringProperty()
     count = db.IntegerProperty()
     isstart = db.BooleanProperty()
+
+
+class Word(object):
+
+    def __init__(self, word, count):
+        self.name = word
+        self.count = count
 
 
 class Database(object):
@@ -82,19 +90,38 @@ class GQuery(object):
         if user:
             chains = UserChain.gql("WHERE preword1 = :1 and preword2 = :2 "
                                    "and user = :3",
-                                    words[0], words[1], user)
+                                    words[1].name, words[2].name, user)
         else:
             chains = Chain.gql("WHERE preword1 = :1 and preword2 = :2",
-                              words[0], words[1])
-        return chains
+                              words[1].name, words[2].name)
+        return chains.fetch(1000)
 
+    def select_nextword(self, words):
+        sum_count = sum([x.count for x in words])
+        probs = []
+        for word in words:
+            probs.append(Word(word.postword, 0))
+            probs[-1].count = float(probs[-1].count) / sum_count
+        probs.sort(lambda x, y: cmp(x.count, y.count), reverse=True)
+        randnum = random.random()
+        sum_prob = 0
+        nextword = ''
+        for i in xrange(len(probs)):
+            sum_prob += probs[i].count
+            if randnum < sum_prob:
+                nextword = words[i]
+                break
+        else:
+            nextword = probs[-1]
+        return nextword 
 
     def get_startword(self, user=None):
         if user:
             words = UserChain.gql("WHERE isstart = True and user = :1",user)
         else:     
             words = Chain.gql("WHERE isstart = True")
-        return random.choice(words)
+        _words = words.fetch(1000)
+        return random.choice(words.fetch(1000))
 
     def get_allchain(self):
         _chains = Chain.all()
@@ -113,22 +140,26 @@ class GQuery(object):
 
     def make_sentence(self, user=None, word=None):
         limit = 1
-        punctuation_words = {u'。': 0, u'．': 0, u'？': 0, u'！': 0,
+        punctuations = {u'。': 0, u'．': 0, u'？': 0, u'！': 0,
                            u'!': 0, u'?': 0, u'w': 0, u'…': 0,}
 
-
         chain = self.get_startword(user)
-        words = [chain.prewords, chain.preword2, chain.postword]
+        words = [Word(chain.preword1, chain.count), 
+                Word(chain.preword2, chain.count), 
+                Word(chain.postword, chain.count)]
         sentence = copy.copy(words)
 
+        count = 0
         while True:
-            enc_cond = (count > limit) and (words[-1].name in punctuations)
+            end_cond = (count > limit) and (words[-1].name in punctuations)
             if end_cond:
                 break
 
             nextwords = self.get_nextwords(words)
+            if len(nextwords) == 0:
+                break
             nextchain = self.select_nextword(nextwords)
-            nextword = nextchain.postword 
+            nextword = Word(nextchain.name, nextchain.count)
             sentence.append(nextword)
             words.pop(0)
             words.append(nextword)

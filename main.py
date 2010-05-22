@@ -16,6 +16,16 @@ from google.appengine.ext.webapp import util, template
 from markovchains import MarkovChains
 
 
+class ShowHandler(webapp.RequestHandler):
+    def get(self):
+        path = os.path.join(os.path.dirname(__file__), 'show.html')
+        m = MarkovChains('gquery')
+        m.load_db('gquery')
+        text = m.db.make_sentence()
+        values = {'text': text}
+        self.response.out.write(template.render(path, values))
+
+
 class TalkHandler(webapp.RequestHandler):
     def get(self):
         path = os.path.join(os.path.dirname(__file__), 'talk.html')
@@ -60,6 +70,7 @@ def main():
     application = webapp.WSGIApplication([
         ('/', TalkHandler),
         ('/learn', LearnHandler),
+        ('/show', ShowHandler),
         ], debug=False)
     util.run_wsgi_app(application)
 
