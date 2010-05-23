@@ -156,7 +156,7 @@ class MarkovChains(object):
     """
     文章生成
     """
-    def make_sentence(self, user=''):
+    def make_sentence(self, user='', word=None):
         limit = 1
 
         if user == '' or user not in self.userchaindic:
@@ -164,11 +164,26 @@ class MarkovChains(object):
         else:
             chaindic = self.userchaindic[user]
         
-        while True:
-            prewords = random.choice(chaindic.keys())
+        if word is not None:
+            prewords_tuple = chaindic.keys()
+            for _prewords in prewords_tuple:
+                if _prewords[0] == word:
+                    break
+            else:
+                return ''
+
+            while True:
+                prewords = random.choice(chaindic.keys())
+                if prewords[0] == word:
+                    break
             postword = random.choice(chaindic[prewords].keys())
-            if chaindic[prewords][postword].isstart:
-                break
+
+        else:
+            while True:
+                prewords = random.choice(chaindic.keys())
+                postword = random.choice(chaindic[prewords].keys())
+                if chaindic[prewords][postword].isstart:
+                    break
 
         words = []
         words.extend(prewords)

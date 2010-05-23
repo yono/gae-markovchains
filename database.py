@@ -115,12 +115,16 @@ class GQuery(object):
             nextword = probs[-1]
         return nextword 
 
-    def get_startword(self, user=None):
-        if user:
+    def get_startword(self, user=None, word=None):
+        if user and word:
+            words = UserChain.gql("WHERE user = :1 and preword1 = :2", 
+                                  user, word)
+        elif user and not word:     
             words = UserChain.gql("WHERE isstart = True and user = :1",user)
-        else:     
+        elif not user and word:
+            words = Chain.gql("WHERE preword1 = :1", word)
+        else:
             words = Chain.gql("WHERE isstart = True")
-        _words = words.fetch(1000)
         return random.choice(words.fetch(1000))
 
     def get_allchain(self):
@@ -143,7 +147,7 @@ class GQuery(object):
         punctuations = {u'。': 0, u'．': 0, u'？': 0, u'！': 0,
                            u'!': 0, u'?': 0, u'w': 0, u'…': 0,}
 
-        chain = self.get_startword(user)
+        chain = self.get_startword(user=user,word=word)
         words = [Word(chain.preword1, chain.count), 
                 Word(chain.preword2, chain.count), 
                 Word(chain.postword, chain.count)]
@@ -166,3 +170,9 @@ class GQuery(object):
             count += 1
         
         return ''.join([x.name for x in sentence])
+
+    def _cond_word(self, word):
+        if word:
+            return ' and preword1 = :word'
+        else:
+            return ''

@@ -21,7 +21,8 @@ class ShowHandler(webapp.RequestHandler):
         path = os.path.join(os.path.dirname(__file__), 'show.html')
         m = MarkovChains('gquery')
         m.load_db('gquery')
-        text = m.db.make_sentence()
+        word = self.request.get('word', default_value=None)
+        text = m.db.make_sentence(word=word)
         values = {'text': text}
         self.response.out.write(template.render(path, values))
 
@@ -37,7 +38,8 @@ class TalkHandler(webapp.RequestHandler):
             text = self.request.get('sentences')
             m = MarkovChains('gquery')
             m.analyze_sentence(text)
-            result = m.make_sentence()
+            word = self.request.get('word', default_value=None)
+            result = m.make_sentence(word=word)
             values = {'result':result}
             self.response.out.write(template.render(path, values))
         else:

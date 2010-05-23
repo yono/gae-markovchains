@@ -8,6 +8,8 @@
     元文章を入力して送信ボタンを押すと、新しい文章を生成します。
     <form action="" method="post">
         <textarea name="sentences" rows="5" cols="100"></textarea><br />
+        先頭の単語を指定できます（オプション）:
+        <input type="text" name="word" /><br />
             <input type="submit" value="送信"/>
     </form>
     {% if result %}
