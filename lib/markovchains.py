@@ -40,7 +40,7 @@ class MarkovChains(object):
     """
     文章を解析し、連想配列に保存
     """
-    def analyze_sentence(self, _text, user=''):
+    def analyze_sentence(self, _text, user=None):
         sentences = self._split_sentences(_text)
         text = '%s。' % sentences[0]
         for i in xrange(1,len(sentences)):
@@ -141,13 +141,13 @@ class MarkovChains(object):
         chains = self.userchaindic
 
         for user in chains:
+            _user = self.db.update_user(user)
             for prewords in chains[user]:
                 for postword in chains[user][prewords]:
                     count = chains[user][prewords][postword].count
                     isstart = chains[user][prewords][postword].isstart
-                    user = chains[user][prewords][postword].user
-                    chain = [prewords[0], prewords[1], postword, user,
-                             count, isstart]
+                    chain = [prewords[0], prewords[1], postword, 
+                             _user.key(), count, isstart]
                     if tuple(chain[0:4]) in exists:
                         self.db.update_userchain(chain)
                     else:
@@ -156,15 +156,15 @@ class MarkovChains(object):
     """
     文章生成
     """
-    def make_sentence(self, user='', word=None):
+    def make_sentence(self, user=None, word=None):
         limit = 1
 
-        if user == '' or user not in self.userchaindic:
+        if user is None or user not in self.userchaindic:
             chaindic = self.chaindic
         else:
             chaindic = self.userchaindic[user]
         
-        if word is not None:
+        if word:
             prewords_tuple = chaindic.keys()
             for _prewords in prewords_tuple:
                 if _prewords[0] == word:
@@ -177,7 +177,6 @@ class MarkovChains(object):
                 if prewords[0] == word:
                     break
             postword = random.choice(chaindic[prewords].keys())
-
         else:
             while True:
                 prewords = random.choice(chaindic.keys())

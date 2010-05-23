@@ -6,6 +6,10 @@ import sys
 import copy
 
 
+class User(db.Model):
+    name = db.StringProperty()
+
+
 class Chain(db.Model):
     preword1 = db.StringProperty()
     preword2 = db.StringProperty()
@@ -18,7 +22,7 @@ class UserChain(db.Model):
     preword1 = db.StringProperty()
     preword2 = db.StringProperty()
     postword = db.StringProperty()
-    user = db.StringProperty()
+    user = db.ReferenceProperty(User)
     count = db.IntegerProperty()
     isstart = db.BooleanProperty()
 
@@ -82,6 +86,14 @@ class GQuery(object):
                           postword=_chain[2], user=_chain[3],
                           count=_chain[4], isstart=_chain[5])
         chain.put()
+
+    def update_user(self, _user):
+        users = User.gql("WHERE name = :1", _user)
+        user = users.get()
+        if user is None:
+            user = User(name=_user)
+            user.put()
+        return user
     
     """
     データ取得
@@ -138,8 +150,8 @@ class GQuery(object):
         _chains = UserChain.all()
         chains = {}
         for chain in _chains:
-            chains[(chain.preword, chain.preword2, chain.postword,
-                    chain.user)] = chain
+            chains[(chain.preword1, chain.preword2, chain.postword,
+                    chain.user.key())] = chain
         return chains
 
     def make_sentence(self, user=None, word=None):
