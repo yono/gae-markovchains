@@ -50,7 +50,7 @@ class LearnHandler(webapp.RequestHandler):
         path = os.path.join(os.path.dirname(__file__), 'learn.html')
         m = MarkovChains()
         m.load_db('gquery')
-        chains = m.db.get_allchain()
+        chains = m.db.chain.all()
         values = {'chains': chains}
         self.response.out.write(template.render(path, values))
 
