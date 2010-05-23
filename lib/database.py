@@ -100,9 +100,10 @@ class GQuery(object):
     """
     def get_nextwords(self, words, user=None):
         if user:
+            _user = User.gql("WHERE name = :1", user).get()
             chains = UserChain.gql("WHERE preword1 = :1 and preword2 = :2 "
                                    "and user = :3",
-                                    words[1].name, words[2].name, user)
+                                    words[1].name, words[2].name, _user)
         else:
             chains = Chain.gql("WHERE preword1 = :1 and preword2 = :2",
                               words[1].name, words[2].name)
@@ -128,16 +129,22 @@ class GQuery(object):
         return nextword 
 
     def get_startword(self, user=None, word=None):
+        if user:
+            _user = User.gql("WHERE name = :1", user).get()
         if user and word:
             words = UserChain.gql("WHERE user = :1 and preword1 = :2", 
-                                  user, word)
+                                  _user, word)
         elif user and not word:     
-            words = UserChain.gql("WHERE isstart = True and user = :1",user)
+            words = UserChain.gql("WHERE isstart = True and user = :1", 
+                                    _user)
         elif not user and word:
             words = Chain.gql("WHERE preword1 = :1", word)
         else:
             words = Chain.gql("WHERE isstart = True")
         return random.choice(words.fetch(1000))
+
+    def get_users(self):
+        return User.all()
 
     def get_allchain(self):
         _chains = Chain.all()
@@ -155,7 +162,8 @@ class GQuery(object):
         return chains
 
     def make_sentence(self, user=None, word=None):
-        limit = 1
+        minimum = 1
+        maximum = 100
         punctuations = {u'。': 0, u'．': 0, u'？': 0, u'！': 0,
                            u'!': 0, u'?': 0, u'w': 0, u'…': 0,}
 
@@ -167,11 +175,14 @@ class GQuery(object):
 
         count = 0
         while True:
-            end_cond = (count > limit) and (words[-1].name in punctuations)
+            end_cond = (count > minimum) and (words[-1].name in punctuations)
             if end_cond:
                 break
+                
+            if count > maximum:
+                break
 
-            nextwords = self.get_nextwords(words)
+            nextwords = self.get_nextwords(words, user=user)
             if len(nextwords) == 0:
                 break
             nextchain = self.select_nextword(nextwords)

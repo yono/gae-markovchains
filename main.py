@@ -87,16 +87,74 @@ class LearnHandler(webapp.RequestHandler):
             chains = m.db.chain.all()
         values = {'chains': chains}
         self.response.out.write(template.render(self.path, values))
-        
+
+
+class ApiSentenceHandler(webapp.RequestHandler):
+    path = get_path('sentence.xml')
+    def post(self):
+        if self.request.get('sentences'):
+            text = self.request.get('sentences')
+            m = MarkovChains('gquery')
+            m.analyze_sentence(text)
+            word = self.request.get('first_word', default_value=None)
+            result = m.make_sentence(word=word)
+            values = {'result':result}
+            self.response.headers['Content-Type'] = 'text/xml'
+            self.response.out.write(template.render(self.path, values))
+        else:
+            values = {'result':''}
+            self.response.headers['Content-Type'] = 'text/xml'
+            self.response.out.write(template.render(self.path, values))
+
+
+class ApiDbSentenceHandler(webapp.RequestHandler):
+    def get(self):
+        filename = os.path.join('db','sentence_get.xml')
+        path = get_path(filename)
+        m = MarkovChains('gquery')
+        m.load_db('gquery')
+        word = self.request.get('first_word', default_value=None)
+        user = self.request.get('user', default_value=None)
+        text = m.db.make_sentence(word=word, user=user)
+        values = {'text': text}
+        self.response.headers['Content-Type'] = 'text/xml'
+        self.response.out.write(template.render(path, values))
+
+    def post(self):
+        filename = os.path.join('db','sentence_post.xml')
+        path = get_path(filename)
+        text = self.request.get('sentences')
+        user = self.request.get('user', default_value=None)
+        m = MarkovChains()
+        m.analyze_sentence(text, user=user)
+        m.load_db('gquery')
+        m.register_data()
+        self.response.headers['Content-Type'] = 'text/xml'
+        self.response.out.write(template.render(path, {}))
+
+
+class ApiDbUserHandler(webapp.RequestHandler):
+    filename = os.path.join('os', 'user.xml')
+    path = get_path(filename)
+    def get(self):
+        m = MarkovChains('gquery')
+        m.load_db('gquery')
+        users = m.db.get_users()
+        values = {'users': users}
+        self.response.headers['Content-Type'] = 'text/xml'
+        self.response.out.write(template.render(self.path, values))
+
 
 def main():
     application = webapp.WSGIApplication([
         ('/', TalkHandler),
         ('/learn', LearnHandler),
         ('/show', ShowHandler),
+        ('/api/sentence', ApiSentenceHandler),
+        ('/api/db/sentence', ApiDbSentenceHandler),
+        ('/api/db/users', ApiDbUserHandler),
         ], debug=False)
     util.run_wsgi_app(application)
-
 
 if __name__ == '__main__':
     main()
