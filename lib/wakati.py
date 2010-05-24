@@ -2,15 +2,24 @@
 # -*- coding: utf-8 -*-
 from xml.parsers.expat import ParserCreate
 import yahoowakati
+import sys
 
 class Wakati(object):
     def __init__(self):
-        self.p = ParserCreate()
-        self.p.buffer_text = True
-        self.p.StartElementHandler = self.start_element
-        self.p.EndElementHandler = self.end_element
-        self.p.CharacterDataHandler = self.char_data
+        #self.p = ParserCreate()
+        #self.p.buffer_text = True
+        #self.p.StartElementHandler = self.start_element
+        #self.p.EndElementHandler = self.end_element
+        #self.p.CharacterDataHandler = self.char_data
         self.words = []
+
+    def get_parser(self):
+        p = ParserCreate()
+        p.buffer_text = True
+        p.StartElementHandler = self.start_element
+        p.EndElementHandler = self.end_element
+        p.CharacterDataHandler = self.char_data
+        return p
 
     def start_element(self, name, attrs):
         global flag
@@ -29,7 +38,9 @@ class Wakati(object):
 
     def parse_text(self, _text):
         text = self._remove_break(_text)
-        self.p.ParseFile(yahoowakati.get_xml(text))
+        xml = yahoowakati.get_xml(text)
+        parser = self.get_parser()
+        parser.ParseFile(xml)
 
     def get_words(self):
         return self.words

@@ -2,7 +2,6 @@
 # -*- coding:utf-8 -*-
 import sys
 import os
-from site import addsitedir
 
 from google.appengine.ext import webapp
 from google.appengine.ext.webapp import util, template
@@ -75,18 +74,27 @@ class LearnHandler(webapp.RequestHandler):
         values = {'chains': chains}
         self.response.out.write(template.render(self.path, values))
 
+    #def post(self):
+    #    text = self.request.get('sentences')
+    #    user = self.request.get('user', default_value=None)
+    #    m = MarkovChains()
+    #    m.analyze_sentence(text, user=user)
+    #    m.load_db('gquery')
+    #    m.register_data()
+    #    if user:
+    #        chains = m.db.uchain.all()
+    #    else:
+    #        chains = m.db.chain.all()
+    #    values = {'chains': chains}
+    #    self.response.out.write(template.render(self.path, values))
+
     def post(self):
         text = self.request.get('sentences')
         user = self.request.get('user', default_value=None)
         m = MarkovChains()
-        m.analyze_sentence(text, user=user)
-        m.load_db('gquery')
-        m.register_data()
-        if user:
-            chains = m.db.uchain.all()
-        else:
-            chains = m.db.chain.all()
-        values = {'chains': chains}
+        m.load_db('gquery2')
+        m.db.store_sentence(text)
+        values = {}
         self.response.out.write(template.render(self.path, values))
 
 
@@ -94,10 +102,9 @@ class LearnTask(webapp.RequestHandler):
     def post(self):
         text = self.request.get('sentences')
         user = self.request.get('user')
-        taskqueue.add(url='/api/db/sentence', 
-                params={'sentences':text, 'user': user})
-
-        self.redirect('/')
+        m = MarkovChains()
+        m.load_db('gquery2')
+        m.db.store_sentence(text)
 
 
 class ApiSentenceHandler(webapp.RequestHandler):
@@ -123,9 +130,8 @@ class ApiDbSentenceTask(webapp.RequestHandler):
         text = self.request.get('sentences')
         user = self.request.get('user', default_value=None)
         m = MarkovChains()
-        m.analyze_sentence(text, user=user)
-        m.load_db('gquery')
-        m.register_data()
+        m.load_db('gquery2')
+        m.db.store_sentence(text)
 
 
 class ApiDbSentenceHandler(webapp.RequestHandler):

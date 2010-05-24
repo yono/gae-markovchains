@@ -2,8 +2,13 @@
 # -*- coding:utf-8 -*-
 from google.appengine.ext import db
 import random
+import re
 import sys
 import copy
+import time
+import sys
+
+from extractword import Sentence
 
 
 class User(db.Model):
@@ -40,6 +45,83 @@ class Database(object):
     def create(cls, dbkind, dbname='default'):
         if dbkind == 'gquery':
             return GQuery(dbname)
+        elif dbkind == 'gquery2':
+            return GQuery2(dbname)
+
+
+class GQuery2(object):
+
+    punctuations = {u'。':0, u'．':0, u'？':0, u'！':0, u'!':0, u'?':0,
+                    u'ｗ':0, u'…':0}
+
+    ps = None
+
+    def __init__(self, dbname):
+        if db:
+            self.s = Sentence()
+            pass
+        else:
+            raise BaseException
+
+    def load_db(self):
+        self.chain = Chain
+        self.uchain = UserChain
+
+    def _split_sentences(self, text):
+        if self.ps is None:
+            self.ps = re.compile(u'[%s]' %\
+                    ('|'.join(self.punctuations.keys())))   
+        return self.ps.split(text)
+
+
+    def _get_kname(self, words):
+        knames = []
+        for i in xrange(len(words)):
+            if words[i] == ' ':
+                knames.append('<SPACE>')
+            else:
+                knames.append(words[i])
+        kname = "id" + '__'.join(knames)
+        return kname
+
+
+    def store_sentence(self, _text):
+        sentences = self._split_sentences(_text)
+        text = u'%s。' % (sentences[0])
+        for i in xrange(1, len(sentences)):
+            if len(u'%s%s。' % (text, sentences[i])) < 400:
+                text = u'%s%s。' % (text, sentences[i])
+            else:
+                self.s.analysis_text(text)
+                words = self.s.get_words()
+                isstart = False
+                tmp_words = []
+                isstart = False
+                for j in xrange(len(words)):
+                    if len(tmp_words) == 3:
+                        if j == 0 or\
+                            (j > 0 and words[j-1] in self.punctuations):
+                            isstart = True
+                        else:
+                            isstart = False
+                        kname = self._get_kname(tmp_words)
+                        obj = db.get(db.Key.from_path("Chain", kname))
+                        if not obj:
+                            obj = Chain(key_name = kname, 
+                                        preword1 = tmp_words[0],
+                                        preword2 = tmp_words[1],
+                                        postword = tmp_words[2],
+                                        count = 1,
+                                        isstart = isstart)
+                        else:
+                            obj.count += 1
+                            obj.isstart = obj.isstart or isstart
+                        obj.put()
+                        
+                        tmp_words.pop(0)
+                    else:
+                        pass
+                    tmp_words.append(words[j])
 
 
 class GQuery(object):
