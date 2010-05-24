@@ -6,6 +6,7 @@ from site import addsitedir
 
 from google.appengine.ext import webapp
 from google.appengine.ext.webapp import util, template
+from google.appengine.api.labs import taskqueue
 
 """
 文字コードの設定
@@ -89,6 +90,16 @@ class LearnHandler(webapp.RequestHandler):
         self.response.out.write(template.render(self.path, values))
 
 
+class LearnTask(webapp.RequestHandler):
+    def post(self):
+        text = self.request.get('sentences')
+        user = self.request.get('user')
+        taskqueue.add(url='/api/db/sentence', 
+                params={'sentences':text, 'user': user})
+
+        self.redirect('/')
+
+
 class ApiSentenceHandler(webapp.RequestHandler):
     path = get_path('sentence.xml')
     def post(self):
@@ -105,6 +116,16 @@ class ApiSentenceHandler(webapp.RequestHandler):
             values = {'result':''}
             self.response.headers['Content-Type'] = 'text/xml'
             self.response.out.write(template.render(self.path, values))
+
+
+class ApiDbSentenceTask(webapp.RequestHandler):
+    def post(self):
+        text = self.request.get('sentences')
+        user = self.request.get('user', default_value=None)
+        m = MarkovChains()
+        m.analyze_sentence(text, user=user)
+        m.load_db('gquery')
+        m.register_data()
 
 
 class ApiDbSentenceHandler(webapp.RequestHandler):
@@ -125,10 +146,8 @@ class ApiDbSentenceHandler(webapp.RequestHandler):
         path = get_path(filename)
         text = self.request.get('sentences')
         user = self.request.get('user', default_value=None)
-        m = MarkovChains()
-        m.analyze_sentence(text, user=user)
-        m.load_db('gquery')
-        m.register_data()
+        taskqueue.add(url='/task', 
+                params={'sentences': text, 'user': user})
         self.response.headers['Content-Type'] = 'text/xml'
         self.response.out.write(template.render(path, {}))
 
@@ -146,6 +165,7 @@ class ApiDbUserHandler(webapp.RequestHandler):
 
 
 def main():
+#def real_main():
     application = webapp.WSGIApplication([
         ('/', TalkHandler),
         ('/learn', LearnHandler),
@@ -153,8 +173,22 @@ def main():
         ('/api/sentence', ApiSentenceHandler),
         ('/api/db/sentence', ApiDbSentenceHandler),
         ('/api/db/users', ApiDbUserHandler),
+        ('/task', ApiDbSentenceTask),
         ], debug=False)
     util.run_wsgi_app(application)
 
+def profile_main():
+    import cProfile, pstats, StringIO, logging
+
+    prof = cProfile.Profile().runctx("real_main()", globals(), locals())
+
+    stream = StringIO.StringIO()
+    stats = pstats.Stats(prof, stream=stream).strip_dirs()
+    stats.sort_stats("cumulative")
+    stats.print_stats('from*')
+    logging.info("Profile data:\n%s", stream.getvalue())
+
+
 if __name__ == '__main__':
     main()
+    #profile_main()
