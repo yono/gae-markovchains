@@ -111,13 +111,25 @@ class ApiSentenceHandler(webapp.RequestHandler):
             self.response.out.write(template.render(self.path, values))
 
 
-class ApiDbSentenceTask(webapp.RequestHandler):
+class ApiDbSentenceLearnTask(webapp.RequestHandler):
     def post(self):
         text = self.request.get('sentences')
         user = self.request.get('user', default_value=None)
         m = MarkovChains()
         m.load_db('gquery2')
         m.db.store_sentence(text)
+
+
+class ApiDbSentenceTalkTask(webapp.RequestHandler):
+    def get(self):
+        m = MarkovChains()
+        m.load_db('gquery2')
+        m.db.store_new_sentence()
+
+    def post(self):
+        m = MarkovChains()
+        m.load_db('gquery2')
+        m.db.store_new_sentence()
 
 
 class ApiDbSentenceHandler(webapp.RequestHandler):
@@ -128,8 +140,8 @@ class ApiDbSentenceHandler(webapp.RequestHandler):
         m.load_db('gquery2')
         word = self.request.get('first_word', default_value=None)
         user = self.request.get('user', default_value=None)
-        #text = m.db.make_sentence(word=word, user=user)
-        text = m.db.make_sentence()
+        text = m.db.fetch_new_sentence()
+        taskqueue.add(url='/task/talk')
         values = {'text': text}
         self.response.headers['Content-Type'] = 'text/xml'
         self.response.out.write(template.render(path, values))
@@ -139,7 +151,7 @@ class ApiDbSentenceHandler(webapp.RequestHandler):
         path = get_path(filename)
         text = self.request.get('sentences')
         user = self.request.get('user', default_value=None)
-        taskqueue.add(url='/task', 
+        taskqueue.add(url='/task/learn', 
                 params={'sentences': text, 'user': user})
         self.response.headers['Content-Type'] = 'text/xml'
         self.response.out.write(template.render(path, {}))
@@ -166,7 +178,8 @@ def main():
         ('/api/sentence', ApiSentenceHandler),
         ('/api/db/sentence', ApiDbSentenceHandler),
         ('/api/db/users', ApiDbUserHandler),
-        ('/task', ApiDbSentenceTask),
+        ('/task/learn', ApiDbSentenceLearnTask),
+        ('/task/talk', ApiDbSentenceTalkTask),
         ], debug=False)
     util.run_wsgi_app(application)
 

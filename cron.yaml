@@ -1,0 +1,4 @@
+cron:
+- description: make new sentence
+  url: /task/talk
+  schedule: every 5 minutes

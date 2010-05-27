@@ -155,6 +155,27 @@ class GQuery2(object):
             self.register_chain(text)
 
 
+    def store_new_sentence(self):
+        obj = memcache.get('sentences')
+        if obj is None:
+            obj = []
+        if len(obj) < 100:
+            text = self.make_sentence()
+            obj.append(text)
+            memcache.set('sentences', obj)
+
+    def fetch_new_sentence(self):
+        obj = memcache.get('sentences')
+        if obj is not None and len(obj) > 0:
+            sys.stderr.write('use obj\n')
+            text = obj.pop(0)
+            memcache.set('sentences', obj)
+        else:
+            sys.stderr.write('use make_sentence\n')
+            text = self.make_sentence()
+        return text
+    
+
     def make_sentence(self, user=None, word=None):
         minimum = 1
         maximum = 100
