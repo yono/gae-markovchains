@@ -1,12 +1,12 @@
 #!/usr/bin/env python
 # -*- coding:utf-8 -*-
 from google.appengine.ext import db
+from google.appengine.api import memcache
 import random
 import re
 import sys
 import copy
 import time
-import sys
 
 from extractword import Sentence
 
@@ -74,15 +74,71 @@ class GQuery2(object):
         return self.ps.split(text)
 
 
-    def _get_kname(self, words):
+    def _get_kname(self, prefix, words):
         knames = []
         for i in xrange(len(words)):
             if words[i] == ' ':
                 knames.append('<SPACE>')
             else:
                 knames.append(words[i])
-        kname = "id" + '__'.join(knames)
+        kname = prefix + '__'.join([x for x in knames])
         return kname
+
+
+    def register_chain(self, text):
+        self.s.analysis_text(text)
+        words = self.s.get_words()
+        isstart = False
+        tmp_words = []
+        isstart = False
+        nexts = {}
+        for j in xrange(len(words)):
+            if len(tmp_words) == 3:
+                if j == 0 or\
+                    (j > 0 and words[j-1] in self.punctuations):
+                    isstart = True
+                else:
+                    isstart = False
+                kname = self._get_kname("id", tmp_words)
+                obj = db.get(db.Key.from_path("Chain", kname))
+                if not obj:
+                    obj = Chain(key_name = kname, 
+                                preword1 = tmp_words[0],
+                                preword2 = tmp_words[1],
+                                postword = tmp_words[2],
+                                count = 1,
+                                isstart = isstart)
+                else:
+                    obj.count += 1
+                    obj.isstart = obj.isstart or isstart
+                obj.put()
+                
+                if obj.isstart == True:
+                    memkname = 'isstart'
+                    obj = memcache.get(memkname)
+                    if obj is None:
+                        obj = {}
+                    obj[kname] = obj.get(kname, 0) + 1
+                    memcache.set(memkname, obj)
+                
+                #memkname = self._get_kname('next', tmp_words[1:])
+                #obj = memcache.get(memkname)
+                #if obj is None:
+                #    obj = {}
+                #obj[tmp_words[2]] = obj.get(tmp_words[2], 0) + 1
+                #memcache.set(memkname, obj)
+                memkname = self._get_kname('', tmp_words[:2])
+                if memkname not in nexts:
+                    nexts[memkname] = {}
+                nexts[memkname][tmp_words[2]] = \
+                        nexts[memkname].get(tmp_words[2], 0) + 1
+
+                
+                tmp_words.pop(0)
+            tmp_words.append(words[j])
+
+        for prewords in nexts:
+            memcache.set_multi(nexts[prewords], key_prefix='next__')
 
 
     def store_sentence(self, _text):
@@ -92,36 +148,118 @@ class GQuery2(object):
             if len(u'%s%s。' % (text, sentences[i])) < 400:
                 text = u'%s%s。' % (text, sentences[i])
             else:
-                self.s.analysis_text(text)
-                words = self.s.get_words()
-                isstart = False
-                tmp_words = []
-                isstart = False
-                for j in xrange(len(words)):
-                    if len(tmp_words) == 3:
-                        if j == 0 or\
-                            (j > 0 and words[j-1] in self.punctuations):
-                            isstart = True
-                        else:
-                            isstart = False
-                        kname = self._get_kname(tmp_words)
-                        obj = db.get(db.Key.from_path("Chain", kname))
-                        if not obj:
-                            obj = Chain(key_name = kname, 
-                                        preword1 = tmp_words[0],
-                                        preword2 = tmp_words[1],
-                                        postword = tmp_words[2],
-                                        count = 1,
-                                        isstart = isstart)
-                        else:
-                            obj.count += 1
-                            obj.isstart = obj.isstart or isstart
-                        obj.put()
-                        
-                        tmp_words.pop(0)
-                    else:
-                        pass
-                    tmp_words.append(words[j])
+                self.register_chain(text)
+                text = ''
+
+        if text:
+            self.register_chain(text)
+
+
+    def make_sentence(self, user=None, word=None):
+        minimum = 1
+        maximum = 100
+        punctuations = {u'。': 0, u'．': 0, u'？': 0, u'！': 0,
+                           u'!': 0, u'?': 0, u'w': 0, u'…': 0,}
+
+        chain = self.get_startword(user=user,word=word)
+        start_words = self.get_words_from_cache(chain[0], 'isstart')
+
+        words = [Word(start_words[0], chain[1]), 
+                Word(start_words[1], chain[1]), 
+                Word(start_words[2], chain[1])]
+        sentence = copy.copy(words)
+
+        count = 0
+        while True:
+            end_cond = (count > minimum) and (words[-1].name in punctuations)
+            if end_cond:
+                break
+                
+            if count > maximum:
+                break
+
+            nextwords = self.get_nextwords([x.name for x in words], user=user)
+            if len(nextwords) == 0:
+                break
+            nextchain = self.select_nextword(nextwords)
+            nextword = Word(nextchain.name, nextchain.count)
+            #nextword = Word(nextchain[0], nextchain[1])
+            sentence.append(nextword)
+            words.pop(0)
+            words.append(nextword)
+            count += 1
+        
+        return ''.join([x.name for x in sentence])
+
+
+    def get_words_from_cache(self, kname, prefix=''):
+        name = kname.lstrip(prefix)
+        return name.replace('<SPACE>',' ').split('__')
+
+
+    def get_startword(self, user=None, word=None):
+        if user:
+            _user = User.gql("WHERE name = :1", user).get()
+        if user and word:
+            words = UserChain.gql("WHERE user = :1 and preword1 = :2", 
+                                  _user, word)
+        elif user and not word:     
+            words = UserChain.gql("WHERE isstart = True and user = :1", 
+                                    _user)
+        elif not user and word:
+            words = Chain.gql("WHERE preword1 = :1", word)
+        else:
+            isstart_obj = memcache.get('isstart')
+            if isstart_obj is None:
+                isstart_obj = {}
+                words = Chain.gql("WHERE isstart = True")
+                for word in words:
+                    kname = self._get_kname('isstart',
+                            [word.preword1, word.preword2, word.postword])
+                                                
+                    isstart_obj[kname] = word.count
+                memcache.set('isstart', isstart_obj)
+                    
+        return random.choice(isstart_obj.items())
+        #return isstart_obj.items()[0]
+
+    def get_nextwords(self, words, user=None):
+        if user:
+            _user = User.gql("WHERE name = :1", user).get()
+            chains = UserChain.gql("WHERE preword1 = :1 and preword2 = :2 "
+                                   "and user = :3",
+                                    words[1].name, words[2].name, _user)
+            return chains.fetch(1000)
+        else:
+            memkname = self._get_kname('next', words[1:])
+            obj = memcache.get(memkname)
+            if obj is None:
+                obj = {}
+                chains = Chain.gql("WHERE preword1 = :1 and preword2 = :2",
+                                  words[1], words[2])
+                for chain in chains.fetch(1000):
+                    obj[chain.postword] = chain.count
+                memcache.set(memkname, obj) 
+            return obj.items()
+
+    def select_nextword(self, words):
+        sum_count = sum([x[1] for x in words])
+        probs = []
+        for word in words:
+            probs.append(Word(word[0], word[1]))
+            probs[-1].count = float(probs[-1].count) / sum_count
+        probs.sort(lambda x, y: cmp(x.count, y.count), reverse=True)
+        randnum = random.random()
+        sum_prob = 0
+        nextword = ''
+        for i in xrange(len(probs)):
+            sum_prob += probs[i].count
+            if randnum < sum_prob:
+                nextword = probs[i]
+                break
+        else:
+            nextword = probs[-1]
+        return nextword 
 
 
 class GQuery(object):

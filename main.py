@@ -74,20 +74,6 @@ class LearnHandler(webapp.RequestHandler):
         values = {'chains': chains}
         self.response.out.write(template.render(self.path, values))
 
-    #def post(self):
-    #    text = self.request.get('sentences')
-    #    user = self.request.get('user', default_value=None)
-    #    m = MarkovChains()
-    #    m.analyze_sentence(text, user=user)
-    #    m.load_db('gquery')
-    #    m.register_data()
-    #    if user:
-    #        chains = m.db.uchain.all()
-    #    else:
-    #        chains = m.db.chain.all()
-    #    values = {'chains': chains}
-    #    self.response.out.write(template.render(self.path, values))
-
     def post(self):
         text = self.request.get('sentences')
         user = self.request.get('user', default_value=None)
@@ -138,11 +124,12 @@ class ApiDbSentenceHandler(webapp.RequestHandler):
     def get(self):
         filename = os.path.join('db','sentence_get.xml')
         path = get_path(filename)
-        m = MarkovChains('gquery')
-        m.load_db('gquery')
+        m = MarkovChains('gquery2')
+        m.load_db('gquery2')
         word = self.request.get('first_word', default_value=None)
         user = self.request.get('user', default_value=None)
-        text = m.db.make_sentence(word=word, user=user)
+        #text = m.db.make_sentence(word=word, user=user)
+        text = m.db.make_sentence()
         values = {'text': text}
         self.response.headers['Content-Type'] = 'text/xml'
         self.response.out.write(template.render(path, values))
