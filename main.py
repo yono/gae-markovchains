@@ -6,6 +6,7 @@ import os
 from google.appengine.ext import webapp
 from google.appengine.ext.webapp import util, template
 from google.appengine.api.labs import taskqueue
+from google.appengine.ext import db
 
 """
 文字コードの設定
@@ -24,6 +25,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'lib'))
 
 
 from markovchains import MarkovChains
+from database import Chain
 
 TEMPLATE_DIR = os.path.join(os.path.dirname(__file__), 'views')
 
@@ -54,7 +56,13 @@ class TalkHandler(webapp.RequestHandler):
             m.analyze_sentence(text)
             word = self.request.get('word', default_value=None)
             result = m.make_sentence(word=word)
-            values = {'result':result}
+            _chaindic = m.chaindic
+            chaindic = []
+            for prewords in _chaindic:
+                for postword in _chaindic[prewords]:
+                    if _chaindic[prewords][postword].isstart:
+                        chaindic.append((prewords[0],prewords[1],postword)) 
+            values = {'result':result, 'chaindic':chaindic, 'original':text}
             self.response.out.write(template.render(self.path, values))
         else:
             values = {'result':''}
@@ -169,6 +177,12 @@ class ApiDbUserHandler(webapp.RequestHandler):
         self.response.out.write(template.render(self.path, values))
 
 
+class DeleteHandler(webapp.RequestHandler):
+    def get(self):
+        from google.appengine.api import memcache
+        memcache.flush_all()
+
+
 def main():
 #def real_main():
     application = webapp.WSGIApplication([
@@ -180,6 +194,7 @@ def main():
         ('/api/db/users', ApiDbUserHandler),
         ('/task/learn', ApiDbSentenceLearnTask),
         ('/task/talk', ApiDbSentenceTalkTask),
+        ('/delete', DeleteHandler),
         ], debug=False)
     util.run_wsgi_app(application)
 

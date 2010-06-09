@@ -17,14 +17,6 @@ class MarkovChains(object):
         self.num = order_num
         self.dbname = dbname
 
-        self.words = {}
-        self.chains = {}
-        self.userchains = {}
-
-        self.newwords = {}
-        self.newchains = {}
-        self.newuserchains = {}
-
         self.chaindic = {}
         self.userchaindic = {}
 
@@ -41,10 +33,14 @@ class MarkovChains(object):
     文章を解析し、連想配列に保存
     """
     def analyze_sentence(self, _text, user=None):
-        sentences = self._split_sentences(_text)
+        text = _text
+        text = text.replace(u'　', u' ')
+        for word in self._get_punctuation():
+            text = re.sub(u'(\%s)\s+' % (word), word, text)
+        sentences = self._split_sentences(text)
         text = '%s。' % sentences[0]
         for i in xrange(1,len(sentences)):
-            if (len('%s%s。' % (text, sentences[i])) < 400):
+            if (len('%s%s。' % (text, sentences[i])) < 300):
                 text = '%s%s。' % (text, sentences[i])
             else:
                 words = self._get_words(text)

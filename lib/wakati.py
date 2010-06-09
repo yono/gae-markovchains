@@ -6,11 +6,6 @@ import sys
 
 class Wakati(object):
     def __init__(self):
-        #self.p = ParserCreate()
-        #self.p.buffer_text = True
-        #self.p.StartElementHandler = self.start_element
-        #self.p.EndElementHandler = self.end_element
-        #self.p.CharacterDataHandler = self.char_data
         self.words = []
 
     def get_parser(self):

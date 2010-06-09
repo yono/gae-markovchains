@@ -12,9 +12,23 @@
         <input type="text" name="word" /><br />
             <input type="submit" value="送信"/>
     </form>
+    {% if original %}
+    <p><b>元の文</b></p><br />
+    <p>{{ original }}</p>
+    {% endif %}
     {% if result %}
     <p><b>作成結果</b><br />
     <p>{{ result }}</p>
+    {% endif %}
+
+    {% if chaindic %}
+        <ul>
+        {% for prewords in chaindic %}
+            <li>
+            {{prewords.0}}:{{prewords.1}}:{{prewords.2}}
+            </li>
+        {% endfor %}
+        </ul>
     {% endif %}
 </body>
 </html>

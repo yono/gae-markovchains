@@ -90,15 +90,10 @@ class GQuery2(object):
         words = self.s.get_words()
         isstart = False
         tmp_words = []
-        isstart = False
+        isstart = True
         nexts = {}
         for j in xrange(len(words)):
             if len(tmp_words) == 3:
-                if j == 0 or\
-                    (j > 0 and words[j-1] in self.punctuations):
-                    isstart = True
-                else:
-                    isstart = False
                 kname = self._get_kname("id", tmp_words)
                 obj = db.get(db.Key.from_path("Chain", kname))
                 if not obj:
@@ -115,24 +110,22 @@ class GQuery2(object):
                 
                 if obj.isstart == True:
                     memkname = 'isstart'
-                    obj = memcache.get(memkname)
-                    if obj is None:
-                        obj = {}
-                    obj[kname] = obj.get(kname, 0) + 1
-                    memcache.set(memkname, obj)
+                    start_chains = memcache.get(memkname)
+                    if start_chains is None:
+                        start_chains = {}
+                    start_chains[kname] = start_chains.get(kname, 0) + 1
+                    memcache.set(memkname, start_chains)
                 
-                #memkname = self._get_kname('next', tmp_words[1:])
-                #obj = memcache.get(memkname)
-                #if obj is None:
-                #    obj = {}
-                #obj[tmp_words[2]] = obj.get(tmp_words[2], 0) + 1
-                #memcache.set(memkname, obj)
                 memkname = self._get_kname('', tmp_words[:2])
                 if memkname not in nexts:
                     nexts[memkname] = {}
                 nexts[memkname][tmp_words[2]] = \
                         nexts[memkname].get(tmp_words[2], 0) + 1
 
+                if (j > 0 and tmp_words[0] in self.punctuations):
+                    isstart = True
+                else:
+                    isstart = False
                 
                 tmp_words.pop(0)
             tmp_words.append(words[j])
@@ -142,10 +135,14 @@ class GQuery2(object):
 
 
     def store_sentence(self, _text):
-        sentences = self._split_sentences(_text)
+        text = _text
+        text = text.replace(u'　', u' ')
+        for word in self.punctuations:
+            text = re.sub(u'(\%s)\s+' % (word), word, text)
+        sentences = self._split_sentences(text)
         text = u'%s。' % (sentences[0])
         for i in xrange(1, len(sentences)):
-            if len(u'%s%s。' % (text, sentences[i])) < 400:
+            if len(u'%s%s。' % (text, sentences[i])) < 300:
                 text = u'%s%s。' % (text, sentences[i])
             else:
                 self.register_chain(text)
@@ -167,11 +164,9 @@ class GQuery2(object):
     def fetch_new_sentence(self):
         obj = memcache.get('sentences')
         if obj is not None and len(obj) > 0:
-            sys.stderr.write('use obj\n')
             text = obj.pop(0)
             memcache.set('sentences', obj)
         else:
-            sys.stderr.write('use make_sentence\n')
             text = self.make_sentence()
         return text
     
@@ -183,7 +178,7 @@ class GQuery2(object):
                            u'!': 0, u'?': 0, u'w': 0, u'…': 0,}
 
         chain = self.get_startword(user=user,word=word)
-        start_words = self.get_words_from_cache(chain[0], 'isstart')
+        start_words = self.get_words_from_cache(chain[0], 'id')
 
         words = [Word(start_words[0], chain[1]), 
                 Word(start_words[1], chain[1]), 
@@ -204,7 +199,6 @@ class GQuery2(object):
                 break
             nextchain = self.select_nextword(nextwords)
             nextword = Word(nextchain.name, nextchain.count)
-            #nextword = Word(nextchain[0], nextchain[1])
             sentence.append(nextword)
             words.pop(0)
             words.append(nextword)
@@ -235,14 +229,13 @@ class GQuery2(object):
                 isstart_obj = {}
                 words = Chain.gql("WHERE isstart = True")
                 for word in words:
-                    kname = self._get_kname('isstart',
+                    kname = self._get_kname('id',
                             [word.preword1, word.preword2, word.postword])
                                                 
                     isstart_obj[kname] = word.count
                 memcache.set('isstart', isstart_obj)
                     
         return random.choice(isstart_obj.items())
-        #return isstart_obj.items()[0]
 
     def get_nextwords(self, words, user=None):
         if user:
@@ -281,6 +274,7 @@ class GQuery2(object):
         else:
             nextword = probs[-1]
         return nextword 
+
 
 
 class GQuery(object):
