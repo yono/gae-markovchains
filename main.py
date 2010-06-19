@@ -36,10 +36,11 @@ def get_path(filename):
 class ShowHandler(webapp.RequestHandler):
     path = get_path('show.html')
     def get(self):
-        m = MarkovChains('gquery')
-        m.load_db('gquery')
+        m = MarkovChains()
+        m.load_db('gquery2')
         word = self.request.get('word', default_value=None)
-        text = m.db.make_sentence(word=word)
+        text = m.db.fetch_new_sentence()
+        taskqueue.add(url='/task/talk')
         values = {'text': text}
         self.response.out.write(template.render(self.path, values))
 
@@ -52,7 +53,7 @@ class TalkHandler(webapp.RequestHandler):
     def post(self):
         if self.request.get('sentences'):
             text = self.request.get('sentences')
-            m = MarkovChains('gquery')
+            m = MarkovChains()
             m.analyze_sentence(text)
             word = self.request.get('word', default_value=None)
             result = m.make_sentence(word=word)
@@ -106,7 +107,7 @@ class ApiSentenceHandler(webapp.RequestHandler):
     def post(self):
         if self.request.get('sentences'):
             text = self.request.get('sentences')
-            m = MarkovChains('gquery')
+            m = MarkovChains()
             m.analyze_sentence(text)
             word = self.request.get('first_word', default_value=None)
             result = m.make_sentence(word=word)
@@ -144,7 +145,7 @@ class ApiDbSentenceHandler(webapp.RequestHandler):
     def get(self):
         filename = os.path.join('db','sentence_get.xml')
         path = get_path(filename)
-        m = MarkovChains('gquery2')
+        m = MarkovChains()
         m.load_db('gquery2')
         word = self.request.get('first_word', default_value=None)
         user = self.request.get('user', default_value=None)
@@ -169,8 +170,8 @@ class ApiDbUserHandler(webapp.RequestHandler):
     filename = os.path.join('os', 'user.xml')
     path = get_path(filename)
     def get(self):
-        m = MarkovChains('gquery')
-        m.load_db('gquery')
+        m = MarkovChains()
+        m.load_db('gquery2')
         users = m.db.get_users()
         values = {'users': users}
         self.response.headers['Content-Type'] = 'text/xml'

@@ -275,6 +275,9 @@ class GQuery2(object):
             nextword = probs[-1]
         return nextword 
 
+    def get_users(self):
+        return User.all()
+
 
 
 class GQuery(object):
